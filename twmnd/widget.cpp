@@ -377,16 +377,23 @@ int Widget::computeWidth()
     boldFont.setBold(true);
     int width = 0;
     QString text = m_contentView["text"]->text();
-    width += QFontMetrics(boldFont).width(m_contentView["title"]->text());
     if (Qt::mightBeRichText(text)) {
         QTextDocument doc;
         doc.setUseDesignMetrics(true);
         doc.setHtml(text);
         doc.setDefaultFont(font());
         width += doc.idealWidth();
+    } else {
+      QStringList lines = text.split("\n");
+      for (int i = 0; i < lines.size(); i++) {
+        int lineWidth = QFontMetrics(boldFont).width(lines.at(i));
+        if (lineWidth > width)
+          width = lineWidth;
+      }
     }
-    else
-        width += QFontMetrics(font()).width(text);
+    //    width += QFontMetrics(font()).width(text);
+    width += 4;
+    width += QFontMetrics(boldFont).width(m_contentView["title"]->text());
     if (m.data["icon"])
         width += m_contentView["icon"]->pixmap()->width();
     return width;
@@ -496,7 +503,7 @@ void Widget::setupTitle()
     Message& m = m_messageQueue.front();
     if (m.data["title"]) {              // avoid ugly space if no icon is set
         QString text = (m.data["icon"] ? " " : "") + m.data["title"]->toString() + " ";
-        foreach (QString i, QStringList() << "\n" << "\r" << "<br/>" << "<br />")
+        foreach (QString i, QStringList() << "\r" << "<br/>" << "<br />")
             text.replace(i, " ");
         m_contentView["title"]->setText(text);
         m_contentView["title"]->setFont(boldFont);
@@ -512,8 +519,8 @@ void Widget::setupContent()
 {
     Message& m = m_messageQueue.front();
     if (m.data["content"]) {
-        QString text = (m.data["icon"] && !m.data["title"] ? " " : "") + m.data["content"]->toString() + " ";
-        foreach (QString i, QStringList() << "\n" << "\r" << "<br/>" << "<br />")
+        QString text = /*(m.data["icon"]&& !m.data["title"] ? " " : "") +*/ m.data["content"]->toString();
+        foreach (QString i, QStringList() << "\r" << "<br/>" << "<br />")
             text.replace(i, " ");
         m_contentView["text"]->setText(text);
         m_contentView["text"]->setMaximumWidth(9999);
@@ -735,6 +742,16 @@ void Widget::wheelEvent(QWheelEvent *e)
 
 std::size_t Widget::getHeight()
 {
-    return m_animation.direction() == QAbstractAnimation::Forward && m_messageQueue.size() ?
-                m_messageQueue.front().data["size"]->toInt() : height();
+    if (m_animation.direction() == QAbstractAnimation::Forward && m_messageQueue.size() > 0) {
+        int lines = 1;
+        QString text = m_messageQueue.front().data["content"]->toString();
+        for (int i = 0; i < text.size(); i++) {
+            if (text[i] == '\n')
+                lines += 1;
+        }
+        return m_messageQueue.front().data["size"]->toInt() * lines;
+    } else
+        return height();
+    //return m_animation.direction() == QAbstractAnimation::Forward && m_messageQueue.size() ?
+    //            m_messageQueue.front().data["size"]->toInt() : height();
 }
